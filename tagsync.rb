@@ -11,21 +11,30 @@ require 'io/console'
 #set to true for verbose messages
 $debug = false
 
-$counter = 0
 $options = {}
-OptionParser.new do |opts|
+optparse = OptionParser.new do |opts|
   opts.banner = "Usage: fixdates.rb [options]"
 
-  opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
+#  opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
 #   opts.on('-r', '--[no-]recursive', 'Recursive search') { |v| options[:search_recursive] = v }
   opts.on('-d', '--dump file', 'Dump ID3 tags of file') { |v| $options[:dump_file] = v }
-  opts.on('-q', '--quiet', 'Be quiet') {|v| $options[:quiet] = v}
 
-  opts.on_tail("-h", "--help", "Show this message") do
+  $options[:quiet] = false
+  opts.on('-q', '--quiet', 'Be quiet') do $options[:quiet] = true end
+
+  $options[:release_only] = false
+  opts.on('-r', '--releaseonly', 'Only update release tags') do $options[:release_only] = true end
+  
+  $options[:key_only] = false
+  opts.on('-k', '--keyonly', 'Only update key tags') do $options[:key_only] = true end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
   end
-end.parse!
+end
+
+optparse.parse!
 
     #dump all non-nil valued frames
 def dumpFrames(tag)
@@ -137,18 +146,25 @@ def updateFileAtPath(path)
       printf("~ %s \n", filename)      
     end
 
-    dateUpdated = copyBeatportDateToTDRC(tag)
-    keyUpdated = copyBeatportKeyToKeyText(tag)
+    dateUpdated = keyUpdated = false
+
+    unless $options[:key_only]
+      dateUpdated = copyBeatportDateToTDRC(tag)      
+    end
+
+    unless $options[:release_only]
+      keyUpdated = copyBeatportKeyToKeyText(tag)      
+    end
 
     needToSave = dateUpdated  === true or keyUpdated === true
 
-    if dateUpdated != true
+    if dateUpdated.is_a? String
       unless $options[:quiet]
         puts "\t" + dateUpdated        
       end
     end
 
-    if keyUpdated != true
+    if keyUpdated.is_a? String
       unless $options[:quiet]
         puts "\t" + keyUpdated
       end
@@ -156,24 +172,29 @@ def updateFileAtPath(path)
 
     if needToSave
       file.save(TagLib::MPEG::File::ID3v2, false) #false prevents id3v1 stripping 
+      return 1
       unless $options[:quiet]
         printf(" Done.\n")       
       end
-      $counter = $counter + 1
     end
-
   end  # File is automatically closed at block end
+  return 0
 end
 
 def main
+
+# TODO support list of ARGV files and folders
+#  ARGV.each do|f|
+#   # process directory or file 
+#   sleep 0.5
+#  end
+
   searchDirectory = "."
   unless $options[:search_directory] === nil
     searchDirectory = $options[:search_directory]
   end
   mp3FilePaths = []
-  # Find.find('./') do |path|
-  #   mp3FilePath << path if path =~ /.*\.mp3$/
-  # end
+
   unless $options[:quiet]
     puts "Searching for mp3's ..."
   end
@@ -189,8 +210,12 @@ def main
     end while (input != 'y' && input != 'n')
 
     unless input == 'n'
-      mp3FilePaths.each{|path| updateFileAtPath(path)}
-      printf("%i files updated.", $counter)      
+      counter = 0
+      mp3FilePaths.each{|path|
+        fileModded = updateFileAtPath(path)
+        counter += fileModded
+      }
+      printf("%i files updated.", counter)      
     end
     #non-interactive. Just continue
   else 
