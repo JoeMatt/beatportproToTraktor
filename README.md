@@ -20,6 +20,10 @@ gem install taglib-ruby
 
 Execution
 ---------
+Recursively run on directory
+```
+./tagsync.rb <dir>
+```
 
 Details
 -------
