@@ -58,6 +58,16 @@ end
 def copyFrameToFrame(tag, fromFrame, toFrame)
 end
 
+def copyCommentsV2toV1(v2Tag, v1Tag)
+
+  comment_frame = v2Tag.frame_list('COMM').first
+  if comment_frame === nil
+    v1Tag.comment = ""
+  else
+    v1Tag.comment = comment_frame.text    
+  end
+end
+
 def cleanKeyCodesFromComments(tag)
   # substrings to strip
   codes = [ "01A", "1A", "01B", "1B",
@@ -71,7 +81,7 @@ def cleanKeyCodesFromComments(tag)
             "09A", "9A", "09B", "9B",
             "10A", "10B",
             "11A", "11B",
-            "12A", "12B", " -"]
+            "12A", "12B", " -", "/"]
 
   comment_frame = tag.frame_list('COMM').first
 
@@ -108,8 +118,6 @@ def cleanKeyCodesFromComments(tag)
           puts "\tNew comment: #{tag.frame_list('COMM').first}"
         end
       end
-
-
     end
 
     return modded
@@ -225,6 +233,9 @@ def updateFileAtPath(path)
 
     if $options[:clean_comments]
       commentsUpdated = cleanKeyCodesFromComments(tag)
+      if commentsUpdated === true
+        copyCommentsV2toV1(tag, file.tag)
+      end
     end
 
     needToSave = (dateUpdated  === true or keyUpdated === true or commentsUpdated === true)
