@@ -15,12 +15,15 @@ $options = {}
 optparse = OptionParser.new do |opts|
   opts.banner = "Usage: fixdates.rb [options]"
 
-#  opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
+  opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
 #   opts.on('-r', '--[no-]recursive', 'Recursive search') { |v| options[:search_recursive] = v }
   opts.on('-d', '--dump file', 'Dump ID3 tags of file') { |v| $options[:dump_file] = v }
 
   $options[:quiet] = false
   opts.on('-q', '--quiet', 'Be quiet') do $options[:quiet] = true end
+
+  $options[:clean_comments] = false
+  opts.on('-c', '--cleancomments', 'String keys from comments') do $options[:clean_comments] = true end
 
   $options[:release_only] = false
   opts.on('-r', '--releaseonly', 'Only update release tags') do $options[:release_only] = true end
@@ -38,15 +41,81 @@ optparse.parse!
 
     #dump all non-nil valued frames
 def dumpFrames(tag)
+  puts "id3v2.#{tag.header.major_version}.#{tag.header.revision_number} #{tag.header.tag_size} bytes"
+
   tag.frame_list.each do |frame|
     unless frame.to_string.nil?
-      print(frame.frame_id + "\t"+  frame.to_string + "\n")      
+      print(frame.frame_id + "\t"+  frame.to_string + "\n") 
+    else
+      if frame.is_a? TagLib::ID3v2::UniqueFileIdentifierFrame
+        print(frame.frame_id + "\t" + frame.identifier() + "\n") 
+      end
     end
   end
 end
 
 # TODO :: simplify code duplication : fromFrame needs to be array of options
 def copyFrameToFrame(tag, fromFrame, toFrame)
+end
+
+def cleanKeyCodesFromComments(tag)
+  # substrings to strip
+  codes = [ "01A", "1A", "01B", "1B",
+            "02A", "2A", "02B", "2B",
+            "03A", "3A", "03B", "3B",
+            "04A", "4A", "04B", "4B",
+            "05A", "5A", "05B", "5B",
+            "06A", "6A", "06B", "6B",
+            "07A", "7A", "07B", "7B",
+            "08A", "8A", "08B", "8B",
+            "09A", "9A", "09B", "9B",
+            "10A", "10B",
+            "11A", "11B",
+            "12A", "12B", " -"]
+
+  comment_frame = tag.frame_list('COMM').first
+
+  unless comment_frame == nil
+
+    #get the string value
+    string = comment_frame.text
+
+    unless $options[:quiet]
+      puts "\tComment: #{string}"      
+    end
+
+    modded = false
+    #strip any subs trings in code array
+    codes.each do |s|
+      result  = string.slice!(s)
+      if result != nil then modded = true end
+    end
+
+    #update tag
+    if modded == true then 
+      # strip leading/trailing white space that may now exist
+      string.rstrip!
+      string.lstrip!
+
+      if string === nil or string.length == 0
+        unless $options[:quiet]
+          puts "\tDeleting comment"
+          tag.remove_frame(comment_frame)
+        end
+      else
+        comment_frame.text = string 
+        unless $options[:quiet]
+          puts "\tNew comment: #{tag.frame_list('COMM').first}"
+        end
+      end
+
+
+    end
+
+    return modded
+  else
+    return "No comments tag"
+  end
 end
 
 # Parameter tag => TagLib::ID3v2
@@ -69,7 +138,7 @@ def copyBeatportDateToTDRC(tag)
     tdrc_frame = tag.frame_list('TDRC').first
 
     if tdrc_frame == nil
-      printf("TDRC Frame is nil. Creating new")
+      unless $options[:quiet] then printf("TDRC Frame is nil. Creating new") end
       # Have to add the frame then get it. Adding it seems to destroy the object
       tag.add_frame(TagLib::ID3v2::TextIdentificationFrame.new("TDRC", TagLib::String::UTF8))
       # Get the referene to the new frame
@@ -83,7 +152,7 @@ def copyBeatportDateToTDRC(tag)
       tdrc_frame.text = beatportDate.to_s
 
       unless $options[:quiet]
-        printf("Updating to " + tag.frame_list('TDRC').first.to_s + " ...")        
+        printf("\tUpdating realase date to " + tag.frame_list('TDRC').first.to_s + "\n")        
       end
       # return true that we've updated the frame
       return true
@@ -122,7 +191,7 @@ def copyBeatportKeyToKeyText(tag)
       keyTextFrame.text = keyFrame.to_s
 
       unless $options[:quiet]
-        printf("Updating to " + tag.frame_list('TKEY').first.to_s + " ...")        
+        puts "\tUpdating key to #{tag.frame_list('TKEY').first.to_s}."        
       end
       # return true that we've updated the frame
       return true
@@ -139,14 +208,12 @@ def updateFileAtPath(path)
     # get the tag object
     tag = file.id3v2_tag
 
-    if $debug then dumpFrames(tag) end
-
     unless $options[:quiet]
       filename = File.basename(path, '.*')
       printf("~ %s \n", filename)      
     end
 
-    dateUpdated = keyUpdated = false
+    commentsUpdated = dateUpdated = keyUpdated = false
 
     unless $options[:key_only]
       dateUpdated = copyBeatportDateToTDRC(tag)      
@@ -156,7 +223,11 @@ def updateFileAtPath(path)
       keyUpdated = copyBeatportKeyToKeyText(tag)      
     end
 
-    needToSave = dateUpdated  === true or keyUpdated === true
+    if $options[:clean_comments]
+      commentsUpdated = cleanKeyCodesFromComments(tag)
+    end
+
+    needToSave = (dateUpdated  === true or keyUpdated === true or commentsUpdated === true)
 
     if dateUpdated.is_a? String
       unless $options[:quiet]
@@ -170,12 +241,20 @@ def updateFileAtPath(path)
       end
     end
 
+    if commentsUpdated.is_a? String
+      unless $options[:quiet]
+        puts "\t" + commentsUpdated
+      end
+    else
+      puts "\t" + (commentsUpdated ? "Comments cleaned" : "Comments didn't contain codes")
+    end
+
     if needToSave
       file.save(TagLib::MPEG::File::ID3v2, false) #false prevents id3v1 stripping 
-      return 1
       unless $options[:quiet]
-        printf(" Done.\n")       
+        puts "\tSaved."       
       end
+      return 1
     end
   end  # File is automatically closed at block end
   return 0

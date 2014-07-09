@@ -3,6 +3,12 @@ beatportproToTraktor
 
 A utility for converting id3 tags from Beatport Pro into a better format for Traktor's tag importer
 
+Features
+--------
++ Sync Release date to a tag Traktor will recognize
++ Sync 'Key' in code form (Open or other) to 'Key Text' so Traktor can search on that field
+++ Traktors "Key" (not 'Key Text') field is not a key but a database entry and is not supported
++ Strip old key codes from Comments field
 
 Installation
 ------------
@@ -22,8 +28,14 @@ Execution
 ---------
 Recursively run on directory
 ```
-./tagsync.rb <dir>
+./tagsync.rb -s <dir>
 ```
+
+For help
+```
+./tagsync.rb --help
+```
+
 
 Details
 -------
@@ -39,6 +51,5 @@ the key codes, I this script allows that by copying the [TKY2] field into [TKEY]
 TODO
 ----
 + Code clean up (my first ruby project)
-+ Support Key field in addition to Key Text
-+ Clean comments field for users who have previously written key into into comments
-++ search and delete Open Key and Camelot Key text
++ Add open key in addition to camelot keys in comment cleaner
++ Support key code stripping from Title/Artist fields since Mixed in Key supports writing to there
