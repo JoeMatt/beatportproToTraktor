@@ -34,6 +34,16 @@ Recursively run on directory
 For help
 ```
 ./tagsync.rb --help
+
+Usage: fixdates.rb [options]
+-s, --searchdirectory NAME       Search directory
+-d, --dump FILE                  Dump ID3 tags of file
+-q, --quiet                      Be quiet
+-c, --cleancomments              String keys from comments
+-r, --releaseonly                Only update release tags
+-k, --keyonly                    Only update key tags
+-1, --stripv1                    Strip v1 id3 tags. Only does this if v2 was updated
+-h, --help                       Show this message
 ```
 
 

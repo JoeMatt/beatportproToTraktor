@@ -17,7 +17,7 @@ optparse = OptionParser.new do |opts|
 
   opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
 #   opts.on('-r', '--[no-]recursive', 'Recursive search') { |v| options[:search_recursive] = v }
-  opts.on('-d', '--dump file', 'Dump ID3 tags of file') { |v| $options[:dump_file] = v }
+  opts.on('-d', '--dump FILE', 'Dump ID3 tags of file') { |v| $options[:dump_file] = v }
 
   $options[:quiet] = false
   opts.on('-q', '--quiet', 'Be quiet') do $options[:quiet] = true end
