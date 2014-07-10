@@ -61,11 +61,25 @@ end
 def copyCommentsV2toV1(v2Tag, v1Tag)
 
   comment_frame = v2Tag.frame_list('COMM').first
-  if comment_frame === nil
-    v1Tag.comment = ""
-  else
-    v1Tag.comment = comment_frame.text    
+
+  if comment_frame != nil and v1Tag.comment != nil and v1Tag.comment == comment_frame.text
+    # already the same
+    return false
   end
+
+  if comment_frame === nil and v1Tag.comment != nil
+    puts "\tDeleting v1 comment"
+    v1Tag.comment = nil
+    return true
+  else
+    unless comment_frame === nil or v1Tag.comment == comment_frame.text
+      puts "\tCopying v2 comment to v1 comment"
+      v1Tag.comment = comment_frame.text    
+      return true      
+    end
+  end
+
+  return false
 end
 
 def cleanKeyCodesFromComments(tag)
@@ -231,10 +245,14 @@ def updateFileAtPath(path)
       keyUpdated = copyBeatportKeyToKeyText(tag)      
     end
 
+    id3v1Updated = false
     if $options[:clean_comments]
       commentsUpdated = cleanKeyCodesFromComments(tag)
-      if commentsUpdated === true
-        copyCommentsV2toV1(tag, file.tag)
+      if commentsUpdated === true and file.id3v1_tag != nil
+        #if we updated v2 comments and there is a v1 tag
+        #copy the new comments otherwise some software (iTunes)
+        #will still read the old v1 comments
+        id3v1Updated = copyCommentsV2toV1(tag, file.id3v1_tag)
       end
     end
 
@@ -261,7 +279,7 @@ def updateFileAtPath(path)
     end
 
     if needToSave
-      file.save(TagLib::MPEG::File::ID3v2, false) #false prevents id3v1 stripping 
+      file.save(TagLib::MPEG::File::ID3v2 | (id3v1Updated ? TagLib::MPEG::File::ID3v1 : 0), false) #false prevents id3v1 stripping 
       unless $options[:quiet]
         puts "\tSaved."       
       end
