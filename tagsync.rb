@@ -31,6 +31,9 @@ optparse = OptionParser.new do |opts|
   $options[:key_only] = false
   opts.on('-k', '--keyonly', 'Only update key tags') do $options[:key_only] = true end
 
+  $options[:strip_v1] = false
+  opts.on('-1', '--stripv1', 'Strip v1 id3 tags. Only does this if v2 was updated') do $options[:strip_v1] = true end
+
   opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
@@ -279,7 +282,13 @@ def updateFileAtPath(path)
     end
 
     if needToSave
-      file.save(TagLib::MPEG::File::ID3v2 | (id3v1Updated ? TagLib::MPEG::File::ID3v1 : 0), false) #false prevents id3v1 stripping 
+      unless $options[:strip_v1]
+        #save v2 or v2 & v1. Don't strip anything
+        file.save(TagLib::MPEG::File::ID3v2 | (id3v1Updated ? TagLib::MPEG::File::ID3v1 : 0), false) #false prevents id3v1 stripping         
+      else
+        # Save v2 and strip v1
+        file.save(TagLib::MPEG::File::ID3v2, true)
+      end
       unless $options[:quiet]
         puts "\tSaved."       
       end
