@@ -249,13 +249,15 @@ def updateFileAtPath(path)
     end
 
     id3v1Updated = false
-    if $options[:clean_comments]
+    if $options[:clean_comments] &&
       commentsUpdated = cleanKeyCodesFromComments(tag)
       if commentsUpdated === true and file.id3v1_tag != nil
         #if we updated v2 comments and there is a v1 tag
         #copy the new comments otherwise some software (iTunes)
         #will still read the old v1 comments
-        id3v1Updated = copyCommentsV2toV1(tag, file.id3v1_tag)
+        unless $options[:strip_v1]
+          id3v1Updated = copyCommentsV2toV1(tag, file.id3v1_tag)          
+        end
       end
     end
 
@@ -273,14 +275,16 @@ def updateFileAtPath(path)
       end
     end
 
-    if commentsUpdated.is_a? String
-      unless $options[:quiet]
-        puts "\t" + commentsUpdated
+    if $options[:clean_comments]
+      if commentsUpdated.is_a? String
+        unless $options[:quiet]
+          puts "\t" + commentsUpdated
+        end
+      else
+        puts "\t" + (commentsUpdated ? "Comments cleaned" : "Comments didn't contain codes")
       end
-    else
-      puts "\t" + (commentsUpdated ? "Comments cleaned" : "Comments didn't contain codes")
     end
-
+    
     if needToSave
       unless $options[:strip_v1]
         #save v2 or v2 & v1. Don't strip anything
@@ -288,6 +292,9 @@ def updateFileAtPath(path)
       else
         # Save v2 and strip v1
         file.save(TagLib::MPEG::File::ID3v2, true)
+        unless $options[:quiet]
+          puts "\tStripping id3v1"
+        end
       end
       unless $options[:quiet]
         puts "\tSaved."       
