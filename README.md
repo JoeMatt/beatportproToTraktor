@@ -63,3 +63,11 @@ TODO
 + Code clean up (my first ruby project)
 + Add open key in addition to camelot keys in comment cleaner
 + Support key code stripping from Title/Artist fields since Mixed in Key supports writing to there
++ Convert Key Code to/from Camelot/Open Key
++ Support Open Key stripping from Title/Artist/Comment
+
+Maybe one day
+-------------
++ Smart playlist creation
++ GUI
++ Customizable Beatport to Traktor tag mapping ie; Venue -> Comment 2
