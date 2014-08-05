@@ -1,4 +1,4 @@
-#!/usr/local/opt/ruby/bin/ruby
+#!/usr/bin/env ruby
 
 # use tablib based on the C++ library api doc: http://taglib.github.io/api/
 require 'taglib'
@@ -13,10 +13,15 @@ $debug = false
 
 $options = {}
 optparse = OptionParser.new do |opts|
-  opts.banner = "Usage: fixdates.rb [options]"
+  opts.banner = "Usage: tagsync.rb [options]"
+  opts.separator ""
+  opts.separator "Specific options:"
 
   opts.on('-s', '--searchdirectory NAME', 'Search directory') { |v| $options[:search_directory] = v }
-#   opts.on('-r', '--[no-]recursive', 'Recursive search') { |v| options[:search_recursive] = v }
+
+  $options[:search_recursive] = true
+  opts.on('-r', '--[no-]recursive', 'Recursive search. Default recursive.') { |v| $options[:search_recursive] = v }
+  
   opts.on('-d', '--dump FILE', 'Dump ID3 tags of file') { |v| $options[:dump_file] = v }
 
   $options[:quiet] = false
@@ -32,9 +37,25 @@ optparse = OptionParser.new do |opts|
   opts.on('-k', '--keyonly', 'Only update key tags') do $options[:key_only] = true end
 
   $options[:strip_v1] = false
-  opts.on('-1', '--stripv1', 'Strip v1 id3 tags. Only does this if v2 was updated') do $options[:strip_v1] = true end
+  opts.on('-1', '--stripv1',  'Strip v1 id3 tags.',
+                              'Only does this if v2 was updated') do $options[:strip_v1] = true end
+
+  $options[:open_to_cam] = false
+  opts.on('-m', '--openToCam', 'Convert Open Key field to Cam key') do $options[:open_to_cam] = true end
+
+  $options[:cam_to_open] = false
+  opts.on('-o', '--camToOpen', 'Convert Cam Key field to Open key') do $options[:cam_to_open] = true end
+
+  $options[:published_to_year] = false
+  opts.on('-p', '--publishedToYear', 'Set the YEAR value according to the year in the published date.',
+                                      'If no published date, does nothing.') do $options[:published_to_year] = true end
 
   opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+
+  if ARGV.length == 0
     puts opts
     exit
   end
@@ -85,20 +106,69 @@ def copyCommentsV2toV1(v2Tag, v1Tag)
   return false
 end
 
+def openToCamKey(v2Tag)
+  openToKeyMap = {  "1d"  => "08B",  "1m" => "08A",
+                    "2d"  => "09B",  "2m" => "09A",
+                    "3d"  => "10B",  "3m" => "10A",
+                    "4d"  => "11B",  "4m" => "11A",
+                    "5d"  => "12B",  "5m" => "12A",
+                    "6d"  => "01B",  "6m" => "01A",
+                    "7d"  => "02B",  "7m" => "02A",
+                    "8d"  => "03B",  "8m" => "03A",
+                    "9d"  => "04B",  "9m" => "04A",
+                    "10d" => "05B", "10m" => "05A",
+                    "11d" => "06B", "11m" => "06A",
+                    "12d" => "07B", "12m" => "07A" }
+
+  return false
+end
+
+def camToOpenKey(v2Tag)
+  openToKeyMap = {  "08B" =>  "1d",  "08A" =>  "1m",
+                    "09B" =>  "2d",  "09A" =>  "2m",
+                    "10B" =>  "3d",  "10A" =>  "3m",
+                    "11B" =>  "4d",  "11A" =>  "4m",
+                    "12B" =>  "5d",  "12A" =>  "5m",
+                    "01B" =>  "6d",  "01A" =>  "6m",
+                    "02B" =>  "7d",  "02A" =>  "7m",
+                    "03B" =>  "8d",  "03A" =>  "8m",
+                    "04B" =>  "9d",  "04A" =>  "9m",
+                    "05B" => "10d",  "05A" => "10m",
+                    "06B" => "11d",  "06A" => "11m",
+                    "07B" => "12d",  "07A" => "12m" }
+
+  return false
+end
+
+def copyPublishedYearToYear(v1Tag, v2Tag)
+  return false
+end
+
 def cleanKeyCodesFromComments(tag)
   # substrings to strip
-  codes = [ "01A", "1A", "01B", "1B",
-            "02A", "2A", "02B", "2B",
-            "03A", "3A", "03B", "3B",
-            "04A", "4A", "04B", "4B",
-            "05A", "5A", "05B", "5B",
-            "06A", "6A", "06B", "6B",
-            "07A", "7A", "07B", "7B",
-            "08A", "8A", "08B", "8B",
-            "09A", "9A", "09B", "9B",
+  codes = [ 
+            # Camelot with and without 0 padding
+            "01A",  "1A", "01B", "1B",
+            "02A",  "2A", "02B", "2B",
+            "03A",  "3A", "03B", "3B",
+            "04A",  "4A", "04B", "4B",
+            "05A",  "5A", "05B", "5B",
+            "06A",  "6A", "06B", "6B",
+            "07A",  "7A", "07B", "7B",
+            "08A",  "8A", "08B", "8B",
+            "09A",  "9A", "09B", "9B",
             "10A", "10B",
             "11A", "11B",
-            "12A", "12B", " -", "/"]
+            "12A", "12B",
+            # Open Key 
+            "1m",   "1d",  "2m",  "2d",
+            "3m",   "3d",  "4m",  "4d",
+            "5m",   "5d",  "6m",  "6d",
+            "7m",   "7d",  "8m",  "9d",
+            "9m",   "9d",  "10m","10d",
+            "11m", "11d", "12m", "12d",
+            # Seperators
+            "-", "/"]
 
   comment_frame = tag.frame_list('COMM').first
 
@@ -305,6 +375,12 @@ def updateFileAtPath(path)
   return 0
 end
 
+def print2(message)
+  unless $options[:quiet]
+    puts message
+  end
+end
+
 def main
 
 # TODO support list of ARGV files and folders
@@ -313,18 +389,27 @@ def main
 #   sleep 0.5
 #  end
 
-  searchDirectory = "."
+  searchDirectory = nil
   unless $options[:search_directory] === nil
     searchDirectory = $options[:search_directory]
+  else
+    searchDirectory = ARGV.last
   end
   mp3FilePaths = []
 
-  unless $options[:quiet]
-    puts "Searching for mp3's ..."
+  if searchDirectory === nil
+    puts "No path specified\n"
+    puts opts
+    exit 1 
   end
   
-  mp3FilePaths = Dir.glob("#{searchDirectory}/**/*.mp3")
-
+  if $options[:search_recursive]
+    print2 "Searching recursively for mp3's ..."
+    mp3FilePaths = Dir.glob("#{searchDirectory}/**/*.mp3")
+  else
+    print2 "Searching for mp3's ..."
+    mp3FilePaths = Dir.glob("#{searchDirectory}/*.mp3")
+  end
   #interactive mode, prompts user to continue after finding mp3's
   unless $options[:quiet]
     puts "#{mp3FilePaths.length} files to process. Continue? [y/n]"
